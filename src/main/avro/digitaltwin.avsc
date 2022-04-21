@@ -1,0 +1,54 @@
+{
+  "type": "record",
+  "namespace": "tech.nermindedovic.papitutorial.models.avro",
+  "name": "DigitalTwin",
+  "fields": [
+    {
+      "name": "reported",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "TurbineState",
+          "fields": [
+            {
+              "name": "timestamp",
+              "type": {
+                "type": "long",
+                "logicalType": "timestamp-millis"
+              }
+            },
+            {
+              "name": "windSpeedMph",
+              "type": ["null","double"],
+              "default": null
+            },
+            {
+              "name": "power",
+              "type": {
+                "type": "enum",
+                "name": "Power",
+                "symbols": ["ON", "OFF"]
+              }
+            },
+            {
+              "name": "type",
+              "type": {
+                "type": "enum",
+                "name": "Type",
+                "symbols": ["DESIRED", "REPORTED"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "desired",
+      "type": {
+        "type": "array",
+        "items": "tech.nermindedovic.papitutorial.models.avro.TurbineState"
+      }
+    }
+  ]
+}
