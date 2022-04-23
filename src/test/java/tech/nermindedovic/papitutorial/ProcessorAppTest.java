@@ -12,6 +12,7 @@ import tech.nermindedovic.papitutorial.models.avro.TurbineState;
 import tech.nermindedovic.papitutorial.models.avro.Type;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -50,8 +51,13 @@ class ProcessorAppTest {
         inputTopic.pipeInput(1L, reported);
 
         final List<KeyValue<Long, DigitalTwin>> keyValues = outputTopic.readKeyValuesToList();
-        assertThat(keyValues).isNotNull();
-
+        assertThat(keyValues).hasSize(2);
+        assertThat(keyValues.get(1).value).isEqualTo(
+                new DigitalTwin(
+                        Collections.singletonList(reported),
+                        Collections.singletonList(new TurbineState(reported.getTimestamp(), reported.getWindSpeedMph(), Power.OFF, Type.DESIRED))
+                )
+        );
     }
 
 
