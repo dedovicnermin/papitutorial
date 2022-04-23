@@ -67,15 +67,16 @@ public class ProcessorApp {
                 digitalTwinSerde
         );
 
-        topology.addStateStore(keyValueStoreStoreBuilder, DigitalTwinProcessor.class.getSimpleName());
+        topology.addStateStore(keyValueStoreStoreBuilder);
 
         final ProcessorSupplier<Long, TurbineState, Long, DigitalTwin> processorSupplier = DigitalTwinProcessor::new;
         topology.addProcessor(
                 DigitalTwinProcessor.class.getSimpleName(),
                 processorSupplier,
                 HIGH_TEMP_PROCESSOR,
-                DESIRED_EVENTS
+                DESIRED_SOURCE_NAME
         );
+        topology.connectProcessorAndStateStores(DigitalTwinProcessor.class.getSimpleName(), keyValueStoreStoreBuilder.name());
         insertSink(topology);
         return topology;
     }
