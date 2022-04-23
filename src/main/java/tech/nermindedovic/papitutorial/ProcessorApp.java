@@ -2,18 +2,21 @@ package tech.nermindedovic.papitutorial;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import org.apache.kafka.common.record.Records;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.processor.api.Processor;
 import org.apache.kafka.streams.processor.api.ProcessorSupplier;
-import org.apache.kafka.streams.processor.api.Record;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.state.Stores;
+import tech.nermindedovic.papitutorial.models.avro.DigitalTwin;
 import tech.nermindedovic.papitutorial.models.avro.TurbineState;
+import tech.nermindedovic.papitutorial.processors.DigitalTwinProcessor;
 import tech.nermindedovic.papitutorial.processors.HighWindsProcessor;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Properties;
 
 public class ProcessorApp {
@@ -26,11 +29,13 @@ public class ProcessorApp {
 
     public static final String OUTPUT = "digital-twins";
     private static final Config config = ConfigFactory.load().getConfig("streams");
-    private static final Serde<TurbineState> turbineStateSerde = StreamUtils.getAvroSerde(Collections.singletonMap("schema.registry.url", "mock://"+ config.getString("application.id")));
+    private static final Map<String,Object> serdeConfig = Collections.singletonMap("schema.registry.url", "mock://"+ config.getString("application.id"));
+    private static final Serde<TurbineState> turbineStateSerde = StreamUtils.getAvroSerde(serdeConfig);
+    private static final Serde<DigitalTwin> digitalTwinSerde = StreamUtils.getAvroSerde(serdeConfig);
 
     public static void main(String[] args) {
-        final ProcessorApp processorApp = new ProcessorApp();
-        Topology topology = processorApp.getTopology();
+
+        Topology topology = ProcessorApp.getTopology();
         final Properties properties = new Properties();
         config.entrySet().forEach(
                 elem -> properties.setProperty(elem.getKey(), config.getString(elem.getKey()))
@@ -48,14 +53,31 @@ public class ProcessorApp {
 
         final Topology topology = new Topology();
         insertReportedSource(topology);
+        insertDesiredSource(topology);
 
+        topology.addProcessor(
+                HIGH_TEMP_PROCESSOR,
+                HighWindsProcessor::new,
+                REPORTED_SOURCE_NAME
+        );
 
+        final StoreBuilder<KeyValueStore<Long, DigitalTwin>> keyValueStoreStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore("DIGITAL-TWIN-STORE"),
+                Serdes.Long(),
+                digitalTwinSerde
+        );
 
+        topology.addStateStore(keyValueStoreStoreBuilder, DigitalTwinProcessor.class.getSimpleName());
+
+        final ProcessorSupplier<Long, TurbineState, Long, DigitalTwin> processorSupplier = DigitalTwinProcessor::new;
+        topology.addProcessor(
+                DigitalTwinProcessor.class.getSimpleName(),
+                processorSupplier,
+                HIGH_TEMP_PROCESSOR,
+                DESIRED_EVENTS
+        );
         insertSink(topology);
-
-
         return topology;
-
     }
 
 
@@ -83,7 +105,7 @@ public class ProcessorApp {
                 OUTPUT,
                 Serdes.Long().serializer(),
                 turbineStateSerde.serializer(),
-                REPORTED_SOURCE_NAME
+                DigitalTwinProcessor.class.getSimpleName()
         );
     }
 
